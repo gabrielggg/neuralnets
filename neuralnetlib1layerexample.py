@@ -41,7 +41,7 @@ class NeuralNetwork:
                 print("**********************")
                 x = self.sigmoid(xv[z], self.wv[z], self.bv[z])
                 #Xj = self.sigmoid(Xi, self.wij, self.bj)
-                if (z == 1):
+                if (z == len(self.wv) - 1):
                     yhat = self.sigmoid(xv[z], self.wv[z], self.bv[z])
                     # gradients for hidden to output weights
                     for z1 in range(len(self.wv) - 1, -1, -1):
