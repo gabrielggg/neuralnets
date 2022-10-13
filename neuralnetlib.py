@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 class NeuralNetwork:
     def __init__(self):
-        #np.random.seed(10) # for generating the same results
+        #np.random.seed(10) # for generating the same resultss
         
         self.wij   = np.random.rand(2,2) # input to hidden layer weights
         self.bj    = np.random.rand(2,1) # bias input
