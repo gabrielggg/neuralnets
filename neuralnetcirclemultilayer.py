@@ -17,11 +17,11 @@ class NeuralNetwork:
     def __init__(self):
         #np.random.seed(10) # for generating the same resultss
         
-        self.wij   = np.random.rand(2,2) # input to hidden layer weights
-        self.bj    = np.random.rand(2,1) # bias input
-        self.wjk   = np.random.rand(2,2) # hidden layer to output weights
-        self.bk    = np.random.rand(2,1) # bias output
-        self.wkl   = np.random.rand(2,1) # hidden layer to output weights
+        self.wij   = np.random.rand(2,3) # input to hidden layer weights
+        self.bj    = np.random.rand(3,1) # bias input
+        self.wjk   = np.random.rand(3,3) # hidden layer to output weights
+        self.bk    = np.random.rand(3,1) # bias output
+        self.wkl   = np.random.rand(3,1) # hidden layer to output weights
         self.bl    = np.random.rand(1,1) # bias outputs
         self.wv = [self.wij, self.wjk, self.wkl]
         self.bv = [self.bj, self.bk, self.bl]
@@ -163,11 +163,15 @@ if __name__ == '__main__':
     testa2 = []
     testb2 = []
     testc = []
+    testc2 = []
+    testd = []
     pretesta = []
     pretestb = []
     pretesta2 = []
     pretestb2 = []
     pretestc = []
+    pretestc2 = []
+    pretestd = []
     neural_network.gradient_descent(X, y, 10000)
     print('Final input to hidden weights: ')
     print(neural_network.wv[0])
@@ -180,9 +184,11 @@ if __name__ == '__main__':
     for i in range(0,100):
         pretesta = []
         pretestb = []
+        pretestc = []
         pretesta2 = []
         pretestb2 = []
-        pretestc = []
+        pretestc2 = []
+        pretestd = []
         for j in range(0,100):
             x1 = i/100
             x2 = j/100
@@ -196,23 +202,31 @@ if __name__ == '__main__':
             yhat = neural_network.sigmoid(Xk, neural_network.wv[2], neural_network.bv[2])
             pretesta.extend([Xj[0][0]])
             pretestb.extend([Xj[0][1]])
+            pretestc.extend([Xj[0][2]])
             pretesta2.extend([Xk[0][0]])
             pretestb2.extend([Xk[0][1]])
-            pretestc.extend(yhat[0])
+            pretestc2.extend([Xk[0][2]])
+            pretestd.extend(yhat[0])
         testa.extend([pretesta])
         testb.extend([pretestb])
+        testc.extend([pretestc])
         testa2.extend([pretesta2])
         testb2.extend([pretestb2])
-        testc.extend([pretestc])
+        testc2.extend([pretestc2])
+        testd.extend([pretestd])
     plt.imshow(testa, cmap='gray', interpolation='nearest')   #plotear la segmentación de la primera neurona(activacion)
     plt.show()
     plt.imshow(testb, cmap='gray', interpolation='nearest')   #plotear la segmentación de la segunda neurona(activacion)
     plt.show()
-    plt.imshow(testa2, cmap='gray', interpolation='nearest')   #plotear la segmentación de la primera neurona de la segunda capa(activacion)
+    plt.imshow(testc, cmap='gray', interpolation='nearest')   #plotear la segmentación de la tercera neurona(activacion)
     plt.show()
-    plt.imshow(testb2, cmap='gray', interpolation='nearest')   #plotear la segmentación de la segunda neurona de la segunda capa(activacion)
+    plt.imshow(testa2, cmap='gray', interpolation='nearest')   #plotear la segmentación de la primera neurona de la segunda capa oculta(activacion)
     plt.show()
-    plt.imshow(testc, cmap='gray', interpolation='nearest')   #plotear la segmentacion en la salida(activación)
+    plt.imshow(testb2, cmap='gray', interpolation='nearest')   #plotear la segmentación de la segunda neurona de la segunda capa oculta(activacion)
+    plt.show()
+    plt.imshow(testc2, cmap='gray', interpolation='nearest')   #plotear la segmentación de la tercera neurona de la segunda capa oculta(activación)
+    plt.show()
+    plt.imshow(testd, cmap='gray', interpolation='nearest')   #plotear la segmentacion en la salida(activación)
     plt.show()
     plt.plot(error)
     plt.ylabel('some numbers')
