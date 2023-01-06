@@ -185,7 +185,7 @@ class NeuralNetwork:
             #yhat_tmp3 = np.copy(yhat)
             #y_tmp3 = np.copy(y)
             loss = self.cross_entropy(yhat,y)
-            print(loss)
+            #print(loss)
             error.append(loss)
             
         #print('The final prediction from neural network are: ')
@@ -242,9 +242,9 @@ if __name__ == '__main__':
     C = np.random.rand(27,2)
     C = np.random.uniform(low=-1, high=1, size=(27,2))
     #print(C)
-    init = C[0]
-    init = np.resize(init, (1, 6))
+    
     #print(init)
+    
     #print(np.shape(X))
     emb = C[X]
     #print(emb)
@@ -271,11 +271,62 @@ if __name__ == '__main__':
     pretesta = []
     pretestb = []
     pretestc = []
-    neural_network.gradient_descent(X, y, 1000)
+    neural_network.gradient_descent(X, y, 2500)
     #print(neural_network.y)
+    #sampling
+    
+    #print(init)
+    #print(C)
+    #init[0][4:] = C[4]
+    #print(init)
+    #print(init[0][4:])
+    
+    letters = [".", "a", "b","c", "d", "e","f", "g", "h","i", "j", "k","l", "m", "n","o", "p", "q","r", "s", "t","u","v","w", "x", "y","z"]
+    for u in range (0,10):
+        name = ""
+        init = C[0]
+        #print(init)
+        init = np.resize(init, (1, 6))
+        for i in range (0,25):
+            
+
+        
+        
+            xx = neural_network.tanh(init, neural_network.wij, neural_network.bj)
+                #print(Xj)
+                #print(Xj)
+                #print(y)
+            predic = neural_network.stable_softmax(xx, neural_network.wjk, neural_network.bk)
+            
+            sample = np.random.choice(np.arange(0, 27, 1), 1, p=predic[0])
+            if i==0:
+                sample= np.random.randint(1,26)
+                #print(sample)
+                init[0][0:2] = init[0][2:4] 
+                init[0][2:4] = init[0][4:] 
+                init[0][4:] = C[sample]
+                #print(init)
+                name = name+letters[sample]
+            elif sample[0] == 0:
+                #print(name)
+                break
+            else:
+                init[0][0:2] = init[0][2:4] 
+                init[0][2:4] = init[0][4:] 
+                init[0][4:] = C[sample[0]]
+                #print(init)
+                #print(sample)
+                name = name+letters[sample[0]]
+        print(name)
+        
+
     #print(np.shape(neural_network.yhat))
     #print(sum(neural_network.yhat[0]))
     #print(np.arange(32))
+    #print(predic)
+    #print(np.arange(0, 27, 1))
+    #sample = np.random.choice(np.arange(0, 27, 1), 1, p=predic[0])
+    #print(sample)
     #print(np.shape(neural_network.y))
     #print(neural_network.y[0].astype(int))
     ind = []
@@ -288,7 +339,7 @@ if __name__ == '__main__':
        #print(neural_network.y[c].astype(int).argmax(axis=0)) 
     #print(neural_network.y[999].astype(int).argmax(axis=0))
     #print(neural_network.y[999].astype(int))
-    print(ind)
+    #print(ind)
     #print()
     #print(neural_network.yhat[np.arange(32), neural_network.y.astype(int)])
     #print('Final input to hidden weights: ')
