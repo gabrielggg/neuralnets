@@ -9,6 +9,7 @@ class NeuralNetwork:
         #np.random.seed(10) # for generating the same resultss
         self.wv = []
         self.bv = []
+        self.error = []
         self.hidden_layers = hidden_layers
         self.neural_net_hidden_architecture = neural_net_architecture[1:-1]
         self.total_neurons = sum(self.neural_net_hidden_architecture)
@@ -51,13 +52,7 @@ class NeuralNetwork:
                 y = y[idx]
             for z in range (len(self.wv)):
                 xv.append(x)
-                #Xi = x
-                #print("**********************")
-                #print(x)
-                #print(xv[z],"a", self.wv[z],"b", self.bv[z], "c")
-                #print("**********************")
                 x = self.sigmoid(xv[z], self.wv[z], self.bv[z])
-                #Xj = self.sigmoid(Xi, self.wij, self.bj)
                 if (z == len(self.wv) - 1):
                     yhat = self.sigmoid(xv[z], self.wv[z], self.bv[z])
                     # gradients for hidden to output weights
@@ -76,19 +71,16 @@ class NeuralNetwork:
                     gwv = gwv[::-1]
                     gbv = gbv[::-1]
                     for zx in range (len(self.wv)): 
-                        #print("------------------------------------------")
-                        #print(self.wv[zx])
-                        #print("------------------------------------------")
-                        #print(gwv[zx])
                         self.wv[zx] += gwv[zx] * self.factor
                         self.bv[zx] += gbv[zx] * self.factor    
-                    error.extend([y[0]-yhat[0]])
+                    self.error.extend([y[0]-yhat[0]])
         
         print('The final prediction from neural network are: ')
         print(yhat)
         print(gwv)
 
-    def test(self):        
+    def test(self):
+        testd = []        
         for i in range(0,100):
                 pretest = []
                 pretestd = []
@@ -100,7 +92,7 @@ class NeuralNetwork:
                     values_arr_x = []
                     values_arr_x.append(Xi)
                     for u in range (self.hidden_layers): 
-                        values_arr_x.append(neural_network.sigmoid(values_arr_x[u], neural_network.wv[u], neural_network.bv[u]))
+                        values_arr_x.append(self.sigmoid(values_arr_x[u], self.wv[u], self.bv[u]))
                         first, last = np.shape(values_arr_x[u+1])
                         pretest.append([])
                         for neuron_index in range (last):
@@ -115,137 +107,21 @@ class NeuralNetwork:
                         counter_neurons = counter_neurons +1
                 testd.extend([pretestd])
         counter_neurons=0
-        #fig = plt.figure(figsize=(10, 7)) 
         fig, ax = plt.subplots(nrows=max(self.neural_net_hidden_architecture), ncols=len(self.neural_net_hidden_architecture)+1, figsize=(10,7))
         for idx in enumerate(self.neural_net_hidden_architecture):
-            for neuronx in range(idx[1]):
-                
+            for neuronx in range(idx[1]):                
                 ax[neuronx][idx[0]].imshow(self.neuron_activation_images_arrays[counter_neurons], cmap='gray', interpolation='nearest')
-                #if(idx[0] != 0 and neuronx != 0):
-                #    fig.add_subplot(rows, columns, counter_neurons+1+((idx[0]+2)*neuronx))
-                #else:
-                #    fig.add_subplot(rows, columns, counter_neurons+1)
-                #plt.imshow(self.neuron_activation_images_arrays[counter_neurons], cmap='gray', interpolation='nearest')   #plotear la segmentación de la primera neurona(activacion)
-                #plt.show()
                 counter_neurons = counter_neurons +1
         ax[0][idx[0]+1].imshow(testd, cmap='viridis_r', interpolation='nearest')
-        #plt.imshow(self.neuron_activation_images_arrays[0], cmap='gray', interpolation='nearest')   #plotear la segmentación de la primera neurona(activacion)
-        #plt.show()
-        #plt.imshow(testb, cmap='gray', interpolation='nearest')   #plotear la segmentación de la segunda neurona(activacion)
-        #plt.show()
-        # plt.imshow(testc, cmap='gray', interpolation='nearest')   #plotear la segmentación de la tercera neurona(activacion)
-        # plt.show()
-        # plt.imshow(testa2, cmap='gray', interpolation='nearest')   #plotear la segmentación de la primera neurona de la segunda capa oculta(activacion)
-        # plt.show()
-        # plt.imshow(testb2, cmap='gray', interpolation='nearest')   #plotear la segmentación de la segunda neurona de la segunda capa oculta(activacion)
-        # plt.show()
-        # plt.imshow(testc2, cmap='gray', interpolation='nearest')   #plotear la segmentación de la tercera neurona de la segunda capa oculta(activación)
-        # plt.show()
-        # plt.imshow(testa3, cmap='gray', interpolation='nearest')   #plotear la segmentación de la primera neurona de la tercera capa oculta(activacion)
-        # plt.show()
-        # plt.imshow(testb3, cmap='gray', interpolation='nearest')   #plotear la segmentación de la segunda neurona de la tercera capa oculta(activacion)
-        # plt.show()
-        # plt.imshow(testc3, cmap='gray', interpolation='nearest')   #plotear la segmentación de la tercera neurona de la tercera capa oculta(activación)
-        # plt.show()
-        #fig.add_subplot(rows, columns, counter_neurons+1)
-        #plt.imshow(testd, cmap='viridis_r', interpolation='nearest')   #plotear la segmentacion en la salida(activación)
-        #plt.show()
         plt.tight_layout()
         plt.show()
-        plt.plot(error)
+        plt.plot(self.error)
         plt.ylabel('some numbers')
         plt.show(block=True)
         
         
 
-def isInside(circle_x, circle_y, rad, x, y):
-     
-        # Compare radius of circle
-        # with distance of its center
-        # from given point
-        if ((x - circle_x) * (x - circle_x) +
-            (y - circle_y) * (y - circle_y) <= rad * rad):
-            return True
-        else:
-            return False
-
-if __name__ == '__main__':
-    neural_network = NeuralNetwork(3, [2,3,5,3,1], 0.01)
-    print('Random starting input to hidden weights: ')
-    print(neural_network.wv[0])
-    print('Random starting hidden to output weights: ')
-    print(neural_network.wv[1])
-    
-    #generando dataset
-    circle_x = 0.5
-    circle_y = 0.5
-    rad = 0.3
-    arrinput = []
-    arroutput = []
-    unosx = []
-    unosy = []
-    zeros = []
-    for ii in range(0,50):
-        for jj in range(0,50):
-            xx = (ii*2)/100
-            yy = (jj*2)/100
-            arrinput.append([xx,yy])
-            if(isInside(circle_x, circle_y, rad, xx, yy)):
-                unosx.append(xx)
-                unosy.append(yy)
-                arroutput.append(1)
-            else:
-                #print("Outside")
-                zeros.append([xx,yy])
-                arroutput.append(0)
-    #indices1 = [i for i, x in enumerate(arroutput) if x == 1]
-    #indices0 = [i for i, x in enumerate(arroutput) if x == 0]
-    unosx = np.array(unosx)
-    unosy = np.array(unosy)
-    print(unosx)
-    plt.scatter(unosx,unosy)
-    plt.show()
-    #print(len(indices1), len(indices0))
-    #X = np.array([[1, 1], [1, 0], [0, 1], [0, 0]])
-    #y = np.array([[0, 1, 1, 0]]).T
-    X = np.array(arrinput, float)
-    y = np.array([arroutput], int).T
-
-    print(len(X), "longitud x")
-    print(X)
-    print(len(y), "length y")
-    print(y)
 
 
-    error = []
-    testa = []
-    testb = []
-    testa2 = []
-    testb2 = []
-    testc = []
-    testc2 = []
-    testa3 = []
-    testb3 = []
-    testc3 = []
-    testd = []
-    pretesta = []
-    pretestb = []
-    pretesta2 = []
-    pretestb2 = []
-    pretestc = []
-    pretestc2 = []
-    pretesta3 = []
-    pretestb3 = []
-    pretestc3 = []
-    pretestd = []
-    neural_network.gradient_descent(X, y, 50000)
-    print('Final input to hidden weights: ')
-    print(neural_network.wv[0])
-    print('Final hidden to output weights: ')
-    print(neural_network.wv[1])
-    print('Final input to hidden bias: ')
-    print(neural_network.bv[0])
-    print('Final hidden to output bias: ')
-    print(neural_network.bv[1])
-    neural_network.test()
+
 
