@@ -1,0 +1,23 @@
+The modified code directly implements every single mathematical component of this equation using NumPy.
+Here is the exact 1-to-1 mapping between the equation in your image and the lines inside the tanh function of your code:
+• \(\mathbf{X}\mathbf{W}_Q\), \(\mathbf{X}\mathbf{W}_K\), \(\mathbf{X}\mathbf{W}_V\) (\(\mathbf{Q}\), \(\mathbf{K}\), \(\mathbf{V}\)):python
+Q = np.dot(xx, w) + b.T
+K = np.dot(xx, w) + b.T
+V = np.dot(xx, w) + b.T
+Usa el código con precaución.
+Your input xx acts as \(\mathbf{X}\), and the hidden layer weights/biases act as the projection parameters to create the Queries, Keys, and Values.
+• \((\mathbf{X}\mathbf{W}_Q)(\mathbf{X}\mathbf{W}_K)^T\):python
+scores = np.dot(Q, K.T)
+Usa el código con precaución.
+This matrix multiplication determines how much each character in your context length relates to every other character.
+• \(\mathbf{M}\) (Scores enmascarados):
+In your current code, \(\mathbf{M} = 0\). In large language models, \(\mathbf{M}\) is a causal matrix filled with zeroes and negative infinities (\(-\infty \)) used to force the network to only look backward, preventing it from cheating by reading future characters during training.
+• \(\text{softmax}(\dots) \rightarrow \mathbf{wei}\):python
+exps = np.exp(scores - np.max(scores, axis=1, keepdims=True))
+wei = exps / np.sum(exps, axis=1, keepdims=True)
+Usa el código con precaución.
+This turns the raw attention scores into probabilities (weights summing up to 1), telling the network exactly how much percentage of attention to pay to each token.
+• \(\mathbf{out} = \mathbf{wei}(\mathbf{X}\mathbf{W}_V)\):python
+out = np.dot(wei, V)
+Usa el código con precaución.
+This aggregates the values (\(\mathbf{V}\)) weighted by your attention map (\(\mathbf{wei}\)), producing the final contextualized representation vector.
