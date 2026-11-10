@@ -1,185 +1,230 @@
 import numpy as np
-import math
 import matplotlib.pyplot as plt
-
 class NeuralNetwork:
-    def __init__(self):
-        # Pesos de proyección para el bloque de Atención (Reemplazan a wij y bj)
-        # Dimensión de entrada = 6, Dimensión oculta/Atención = 100
-        self.W_Q = np.random.uniform(low=-0.1, high=0.1, size=(6, 100))
-        self.W_K = np.random.uniform(low=-0.1, high=0.1, size=(6, 100))
-        self.W_V = np.random.uniform(low=-0.1, high=0.1, size=(6, 100))
-        
-        # Pesos de la capa de salida (Clasificador)
-        self.wjk = np.random.uniform(low=-0.1, high=0.1, size=(100, 27))
-        self.bk  = np.random.uniform(low=-0.1, high=0.1, size=(27, 1))
-        
-    def stable_softmax(self, x, w, b):
-        X = np.dot(x, w) + b.T
-        exps = np.exp(X - np.max(X, axis=1, keepdims=True))
-        return exps / exps.sum(axis=1, keepdims=True)
-
-    def delta_cross_entropy(self, yhaty, yy):
-        yhat_tmp = np.copy(yhaty)
-        y_tmp = np.copy(yy).argmax(axis=1)
-        m = y_tmp.shape[0]
-        grad = yhat_tmp
-        grad[range(m), y_tmp] -= 1
-        grad = grad / m
-        return grad
-
-    def cross_entropy(self, yhaty, yy):
-        yhat_tmp = np.copy(yhaty)
-        y_tmp = np.copy(yy).argmax(axis=1)
-        m = y_tmp.shape[0]
-        p = yhat_tmp
-        log_likelihood = -np.log(p[range(m), y_tmp])
-        loss = np.sum(log_likelihood) / m
-        return loss
-
-    def gradient_descent(self, x, y, iterations):
+    def __init__(self, vocab_size, block_size=3, embedding_dim=32, hidden_dim=64):
+        self.D = embedding_dim
+        self.H = hidden_dim
+        self.T = block_size
+        rng = np.random.default_rng(42)
+        # Character and positional embeddings
+        self.C = rng.normal(0, 0.3, (vocab_size, self.D))
+        self.P = rng.normal(0, 0.05, (self.T, self.D))
+        # Attention projections
+        self.W_Q = rng.normal(0, 1/np.sqrt(self.D), (self.D, self.D))
+        self.W_K = rng.normal(0, 1/np.sqrt(self.D), (self.D, self.D))
+        self.W_V = rng.normal(0, 1/np.sqrt(self.D), (self.D, self.D))
+        # Feed-forward layer
+        self.W1 = rng.normal(0, np.sqrt(2/(2*self.D+self.H)),
+                             (2*self.D, self.H))
+        self.b1 = np.zeros((1, self.H))
+        # Output classifier
+        self.W2 = rng.normal(0, 1/np.sqrt(self.H),
+                             (self.H, vocab_size))
+        self.b2 = np.zeros((1, vocab_size))
+    # --------------------------------------------------------
+    # SOFTMAX
+    # --------------------------------------------------------
+    def softmax(self, x):
+        exps = np.exp(x - np.max(x, axis=1, keepdims=True))
+        return exps / np.sum(exps, axis=1, keepdims=True)
+    # --------------------------------------------------------
+    # FORWARD PASS
+    # --------------------------------------------------------
+    def forward(self, X, cache=False):
+        # X: (B, T), character indices
+        # E: (B, T, D), embeddings + positional embeddings
+        E = self.C[X] + self.P
+        # Query comes from the last character
+        Q = E[:, -1, :] @ self.W_Q
+        # Keys and values come from all characters
+        K = E @ self.W_K
+        V = E @ self.W_V
+        # Scaled dot-product attention
+        scores = np.sum(Q[:, None, :] * K, axis=2) / np.sqrt(self.D)
+        wei = self.softmax(scores)
+        # Attention output
+        Xj = np.sum(wei[:, :, None] * V, axis=1)
+        # Concatenate attention output and last embedding
+        Xh = np.concatenate([Xj, E[:, -1, :]], axis=1)
+        # Feed-forward layer
+        H = np.tanh(Xh @ self.W1 + self.b1)
+        # Output layer
+        logits = H @ self.W2 + self.b2
+        if cache:
+            return logits, (X, E, Q, K, V, wei, Xh, H)
+        return logits
+    # --------------------------------------------------------
+    # CROSS ENTROPY
+    # --------------------------------------------------------
+    def cross_entropy(self, logits, Y):
+        m = len(Y)
+        maximum = np.max(logits, axis=1, keepdims=True)
+        log_sum = maximum[:, 0] + np.log(
+            np.sum(np.exp(logits - maximum), axis=1)
+        )
+        return np.mean(log_sum - logits[np.arange(m), Y])
+    # --------------------------------------------------------
+    # BACKPROPAGATION
+    # --------------------------------------------------------
+    def backward(self, logits, Y, c):
+        X, E, Q, K, V, wei, Xh, H = c
+        m = len(Y)
+        # Output softmax + cross entropy
+        d_out = self.softmax(logits)
+        d_out[np.arange(m), Y] -= 1
+        d_out /= m
+        g_W2 = H.T @ d_out
+        g_b2 = np.sum(d_out, axis=0, keepdims=True)
+        d_H = d_out @ self.W2.T
+        # Backpropagation through tanh
+        d_H *= (1 - H**2)
+        g_W1 = Xh.T @ d_H
+        g_b1 = np.sum(d_H, axis=0, keepdims=True)
+        d_Xh = d_H @ self.W1.T
+        # Split gradients of concatenated representation
+        d_Xj = d_Xh[:, :self.D]
+        d_last = d_Xh[:, self.D:]
+        # Xj = sum(wei * V)
+        d_V = wei[:, :, None] * d_Xj[:, None, :]
+        d_wei = np.sum(
+            d_Xj[:, None, :] * V, axis=2
+        )
+        # Backpropagation through attention softmax
+        d_scores = wei * (
+            d_wei - np.sum(d_wei * wei, axis=1, keepdims=True)
+        )
+        # scores = Q * K / sqrt(D)
+        scale = np.sqrt(self.D)
+        d_Q = np.sum(
+            d_scores[:, :, None] * K, axis=1
+        ) / scale
+        d_K = d_scores[:, :, None] * Q[:, None, :] / scale
+        # Gradients of attention projections
+        g_W_Q = E[:, -1, :].T @ d_Q
+        g_W_K = E.reshape(-1, self.D).T @ d_K.reshape(-1, self.D)
+        g_W_V = E.reshape(-1, self.D).T @ d_V.reshape(-1, self.D)
+        # Gradients towards embeddings
+        d_E = d_K @ self.W_K.T + d_V @ self.W_V.T
+        d_E[:, -1, :] += d_Q @ self.W_Q.T + d_last
+        # Character embedding gradients
+        g_C = np.zeros_like(self.C)
+        np.add.at(g_C, X, d_E)
+        # Positional embedding gradients
+        g_P = np.sum(d_E, axis=0)
+        return {
+            "C": g_C, "P": g_P,
+            "W_Q": g_W_Q, "W_K": g_W_K, "W_V": g_W_V,
+            "W1": g_W1, "b1": g_b1,
+            "W2": g_W2, "b2": g_b2
+        }
+    # --------------------------------------------------------
+    # GRADIENT DESCENT
+    # --------------------------------------------------------
+    def gradient_descent(self, X, Y, iterations, batch_size=100):
+        error = []
+        rng = np.random.default_rng(123)
         for i in range(iterations):
-            # Muestreo de mini-batches (Tamaño = 100)
-            idx = np.random.choice(np.arange(len(x)), 100, replace=False)
-            Xi = x[idx]
-            Yi = y[idx]
-            
-            # --- FORWARD PASS (Capa de Self-Attention) ---
-            Q = np.dot(Xi, self.W_Q)                       # (100, 100)
-            K = np.dot(Xi, self.W_K)                       # (100, 100)
-            V = np.dot(Xi, self.W_V)                       # (100, 100)
-            
-            # Puntuaciones y pesos de atención (wei)
-            scores = np.dot(Q, K.T)                        # (100, 100)
-            exps = np.exp(scores - np.max(scores, axis=1, keepdims=True))
-            wei = exps / np.sum(exps, axis=1, keepdims=True) # (100, 100)
-            
-            # Representación contextualizada (Xj)
-            Xj = np.dot(wei, V)                            # (100, 100)
-            
-            # Capa lineal de salida + Softmax
-            yhat = self.stable_softmax(Xj, self.wjk, self.bk)
-            yhat = np.clip(yhat, 1e-7, 1 - 1e-7)
-            
-            # --- BACKPROPAGATION ---
-            # Gradiente de la capa de salida
-            d_out = self.delta_cross_entropy(yhat, Yi)
-            g_wjk = np.dot(Xj.T, d_out)
-            g_bk  = np.sum(d_out, axis=0, keepdims=True).T
-            
-            # Gradiente hacia el estado oculto Xj
-            d_Xj = np.dot(d_out, self.wjk.T)               # (100, 100)
-            
-            # Gradiente a través del cálculo de Xj = wei * V
-            d_V = np.dot(wei.T, d_Xj)                      # (100, 100)
-            d_wei = np.dot(d_Xj, V.T)                      # (100, 100)
-            
-            # Gradiente del Softmax de Atención
-            d_scores = wei * (d_wei - np.sum(d_wei * wei, axis=1, keepdims=True))
-            
-            # Gradiente de la multiplicación de matrices scores = Q * K^T
-            d_Q = np.dot(d_scores, K)                      # (100, 100)
-            d_K = np.dot(d_scores.T, Q)                    # (100, 100)
-            
-            # Gradientes finales de los proyectores Q, K, V
-            g_W_Q = np.dot(Xi.T, d_Q)                      # (6, 100)
-            g_W_K = np.dot(Xi.T, d_K)                      # (6, 100)
-            g_W_V = np.dot(Xi.T, d_V)                      # (6, 100)
-            
-            # --- ACTUALIZACIÓN DE PARÁMETROS ---
-            learning_rate = 1.0
-            self.W_Q -= g_W_Q * learning_rate
-            self.W_K -= g_W_K * learning_rate
-            self.W_V -= g_W_V * learning_rate
-            self.wjk -= g_wjk * learning_rate
-            self.bk  -= g_bk  * learning_rate
-            
-            # Guardar la pérdida (loss) global
-            loss = self.cross_entropy(yhat, Yi)
+            # Random mini-batch
+            idx = rng.choice(
+                len(X), min(batch_size, len(X)), replace=False
+            )
+            Xi = X[idx]
+            Yi = Y[idx]
+            # Forward pass
+            logits, c = self.forward(Xi, cache=True)
+            loss = self.cross_entropy(logits, Yi)
+            # Backpropagation
+            grads = self.backward(logits, Yi, c)
+            # Gradient clipping
+            norm = np.sqrt(sum(np.sum(g**2) for g in grads.values()))
+            if norm > 1.0:
+                grads = {k: g / norm for k, g in grads.items()}
+            # Learning rate decay
+            lr = 0.05 * (1 - 0.9 * i / iterations)
+            # Update parameters using gradient descent
+            self.C -= lr * grads["C"]
+            self.P -= lr * grads["P"]
+            self.W_Q -= lr * grads["W_Q"]
+            self.W_K -= lr * grads["W_K"]
+            self.W_V -= lr * grads["W_V"]
+            self.W1 -= lr * grads["W1"]
+            self.b1 -= lr * grads["b1"]
+            self.W2 -= lr * grads["W2"]
+            self.b2 -= lr * grads["b2"]
             error.append(loss)
-            
-        np.set_printoptions(formatter={'float': lambda x: "{0:0.6f}".format(x)})
-        self.yhat = yhat
-        self.y = Yi
-
-
-if __name__ == '__main__':
-    neural_network = NeuralNetwork()
-    
-    # Lectura del dataset de nombres
-    words = open('names.txt', 'r').read().splitlines()
-
-    # Construcción del vocabulario e índices de mapeo
-    chars = sorted(list(set(''.join(words))))
-    stoi = {s:i+1 for i,s in enumerate(chars)}
-    stoi['.'] = 0
-    itos = {i:s for s,i in stoi.items()}
-
-    # Construcción del dataset estructurado con block_size = 3
-    block_size = 3 
+            if (i + 1) % 500 == 0:
+                print(f"Iteration {i+1}: Loss = {loss:.4f}")
+        return error
+    # --------------------------------------------------------
+    # GENERATE NAMES
+    # --------------------------------------------------------
+    def generate_name(self, itos, temperature=0.8):
+        context = [0] * self.T
+        name = ""
+        for i in range(20):
+            X = np.array([context])
+            logits = self.forward(X)
+            # Temperature sampling
+            probs = self.softmax(logits / temperature)[0]
+            # Avoid ending the name too early
+            if len(name) < 2:
+                probs[0] = 0
+                probs /= np.sum(probs)
+            sample = np.random.choice(
+                len(probs), p=probs
+            )
+            # End token
+            if sample == 0:
+                break
+            name += itos[sample]
+            # Slide context window
+            context = context[1:] + [sample]
+        return name
+# ============================================================
+# MAIN
+# ============================================================
+if __name__ == "__main__":
+    # Read dataset
+    words = open("names.txt", "r").read().splitlines()
+    # Vocabulary
+    chars = sorted(set("".join(words)))
+    stoi = {s: i+1 for i, s in enumerate(chars)}
+    stoi["."] = 0
+    itos = {i: s for s, i in stoi.items()}
+    vocab_size = len(stoi)
+    # Build dataset
+    block_size = 3
     X, Y = [], []
     for w in words:
         context = [0] * block_size
-        for ch in w + '.':
+        for ch in w + ".":
             ix = stoi[ch]
-            X.append(context)
+            X.append(context.copy())
             Y.append(ix)
-            context = context[1:] + [ix] 
-    
-    n_values = 27
-    Y = np.eye(n_values)[Y]
-    
-    # Matriz de embeddings para caracteres
-    C = np.random.uniform(low=-1, high=1, size=(27, 2))
-    emb = C[X]
-    emb = np.reshape(emb, (len(X), 6))
-
-    X_train = emb
-    y_train = Y
-    error = []
-    
-    # Entrenamiento mediante descenso de gradiente
-    neural_network.gradient_descent(X_train, y_train, 2500)
-    
-    # --- MUESTREO / GENERACIÓN DE NUEVOS NOMBRES ---
-    letters = [".", "a", "b","c", "d", "e","f", "g", "h","i", "j", "k","l", "m", "n","o", "p", "q","r", "s", "t","u","v","w", "x", "y","z"]
-    print("--- Nombres generados ---")
-    for u in range(10):
-        name = ""
-        init = C[0]
-        init = np.resize(init, (1, 6))
-        
-        for i in range(25):
-            # Forward pass de atención para un único elemento
-            Q = np.dot(init, neural_network.W_Q)
-            K = np.dot(init, neural_network.W_K)
-            V = np.dot(init, neural_network.W_V)
-            
-            scores = np.dot(Q, K.T)
-            exps = np.exp(scores - np.max(scores, axis=1, keepdims=True))
-            wei = exps / np.sum(exps, axis=1, keepdims=True)
-            Xj = np.dot(wei, V)
-            
-            predic = neural_network.stable_softmax(Xj, neural_network.wjk, neural_network.bk)
-            
-            sample = np.random.choice(np.arange(0, 27, 1), 1, p=predic[0])
-            if i == 0:
-                sample = np.random.randint(1, 26)
-                init[0][0:2] = init[0][2:4] 
-                init[0][2:4] = init[0][4:] 
-                init[0][4:] = C[sample]
-                name = name + letters[sample]
-            elif sample[0] == 0:
-                break
-            else:
-                init[0][0:2] = init[0][2:4] 
-                init[0][2:4] = init[0][4:] 
-                init[0][4:] = C[sample[0]]
-                name = name + letters[sample[0]]
+            context = context[1:] + [ix]
+    X = np.array(X, dtype=np.int64)
+    Y = np.array(Y, dtype=np.int64)
+    # Initialize network
+    neural_network = NeuralNetwork(
+        vocab_size=vocab_size,
+        block_size=block_size,
+        embedding_dim=32,
+        hidden_dim=64
+    )
+    # Training
+    error = neural_network.gradient_descent(
+        X, Y, iterations=10000, batch_size=100
+    )
+    # Generate names
+    print("\n--- Generated names ---")
+    for i in range(20):
+        name = neural_network.generate_name(
+            itos, temperature=0.8
+        )
         print(name)
-        
-    # Graficar la curva de aprendizaje (Loss over time)
+    # Plot loss
     plt.plot(error)
-    plt.ylabel('loss')
-    plt.xlabel('iterations')
+    plt.ylabel("Loss")
+    plt.xlabel("Iterations")
+    plt.title("Training Loss")
     plt.show()
